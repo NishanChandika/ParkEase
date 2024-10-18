@@ -7,7 +7,7 @@ define('DB_NAME', 'parking_reservation_system');
 
 // Application settings
 define('SITE_NAME', 'ParkEase');
-define('SITE_URL', 'http://localhost/parking-reservation-system');
+define('SITE_URL', 'http://localhost/ParkEase');
 
 // Start session
 session_start();

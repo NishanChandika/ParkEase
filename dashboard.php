@@ -186,7 +186,7 @@ $current_page = 'dashboard';
             <h2>Dashboard Actions</h2>
             <div class="dashboard-actions">
                 <a href="make_reservation.php" class="btn">Make a New Reservation</a>
-                <a href="view_parking_spots.php" class="btn">View Parking Spots</a>
+                <a href="index.php" class="btn">View Parking Spots</a>
             </div>
         </section>
 

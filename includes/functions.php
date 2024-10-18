@@ -1,4 +1,6 @@
 <?php
+// Database connection should be available as $conn
+
 function get_user_by_id($user_id) {
     global $conn;
     $stmt = $conn->prepare("SELECT id, username, email, role FROM users WHERE id = ?");
@@ -8,63 +10,10 @@ function get_user_by_id($user_id) {
     return $result->fetch_assoc();
 }
 
-function check_login() {
-    if (isset($_SESSION['user_id'])) {
-        return get_user_by_id($_SESSION['user_id']);
-    }
-    return false;
-}
-
-function attempt_login($username, $password) {
-    global $conn;
-    $stmt = $conn->prepare("SELECT id, username, password, role FROM users WHERE username = ?");
-    $stmt->bind_param("s", $username);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($user = $result->fetch_assoc()) {
-        if (password_verify($password, $user['password'])) {
-            return $user;
-        }
-    }
-    return false;
-}
-
-function register_user($username, $email, $password) {
-    global $conn;
-    
-    // Check if username or email already exists
-    $stmt = $conn->prepare("SELECT id FROM users WHERE username = ? OR email = ?");
-    $stmt->bind_param("ss", $username, $email);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result->num_rows > 0) {
-        return "Username or email already exists";
-    }
-    
-    // Hash the password
-    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-    
-    // Insert new user
-    $stmt = $conn->prepare("INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, 'user')");
-    $stmt->bind_param("sss", $username, $email, $hashed_password);
-    
-    if ($stmt->execute()) {
-        return true;
-    } else {
-        return "Registration failed: " . $conn->error;
-    }
-}
-
-
 function get_all_parking_spots() {
     global $conn;
     $result = $conn->query("SELECT * FROM parking_spots ORDER BY name");
-    if ($result) {
-        return $result->fetch_all(MYSQLI_ASSOC);
-    }
-    return [];
+    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 }
 
 function get_parking_spot($spot_id) {
@@ -83,6 +32,7 @@ function add_parking_spot($name, $latitude, $longitude, $hourly_rate) {
     return $stmt->execute();
 }
 
+// New Function to Update a Parking Spot
 function update_parking_spot($spot_id, $name, $latitude, $longitude, $hourly_rate) {
     global $conn;
     $stmt = $conn->prepare("UPDATE parking_spots SET name = ?, latitude = ?, longitude = ?, hourly_rate = ? WHERE id = ?");
@@ -90,6 +40,7 @@ function update_parking_spot($spot_id, $name, $latitude, $longitude, $hourly_rat
     return $stmt->execute();
 }
 
+// New Function to Delete a Parking Spot
 function delete_parking_spot($spot_id) {
     global $conn;
     $stmt = $conn->prepare("DELETE FROM parking_spots WHERE id = ?");
@@ -101,11 +52,7 @@ function create_reservation($user_id, $spot_id, $start_time, $end_time) {
     global $conn;
     $stmt = $conn->prepare("INSERT INTO reservations (user_id, spot_id, start_time, end_time, status) VALUES (?, ?, ?, ?, 'confirmed')");
     $stmt->bind_param("iiss", $user_id, $spot_id, $start_time, $end_time);
-    
-    if ($stmt->execute()) {
-        return $conn->insert_id;
-    }
-    return false;
+    return $stmt->execute() ? $conn->insert_id : false;
 }
 
 function get_user_reservations($user_id) {
@@ -128,10 +75,7 @@ function get_all_reservations() {
                             JOIN users u ON r.user_id = u.id 
                             JOIN parking_spots p ON r.spot_id = p.id 
                             ORDER BY r.start_time DESC");
-    if ($result) {
-        return $result->fetch_all(MYSQLI_ASSOC);
-    }
-    return [];
+    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 }
 
 function cancel_reservation($reservation_id, $user_id) {
@@ -170,15 +114,6 @@ function calculate_reservation_cost($spot_id, $start_time, $end_time) {
     return $hours * $hourly_rate;
 }
 
-function require_admin() {
-    $user = check_login();
-    if (!$user || $user['role'] !== 'admin') {
-        header('Location: index.php');
-        exit;
-    }
-    return $user;
-}
-
 // Utility function to sanitize input
 function sanitize_input($data) {
     $data = trim($data);
@@ -187,15 +122,46 @@ function sanitize_input($data) {
     return $data;
 }
 
-// Function to generate a CSRF token
-function generate_csrf_token() {
-    if (!isset($_SESSION['csrf_token'])) {
-        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+function get_parking_spot_rate($spot_id) {
+    global $conn; // Assuming you are using $conn as the DB connection
+
+    $query = "SELECT hourly_rate FROM parking_spots WHERE id = ? AND is_active = 1";
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param('i', $spot_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($row = $result->fetch_assoc()) {
+        return $row['hourly_rate']; // Return rate as a decimal
+    } else {
+        return false; // Spot not found or inactive
     }
-    return $_SESSION['csrf_token'];
 }
 
-// Function to verify CSRF token
-function verify_csrf_token($token) {
-    return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
+// Function to calculate the total payment based on start time, end time, and parking spot rate
+function calculate_payment($spot_id, $start_time, $end_time) {
+    // Get the rate from the database
+    $rate_per_hour = get_parking_spot_rate($spot_id);
+
+    if (!$rate_per_hour) {
+        return "Invalid or inactive parking spot.";
+    }
+
+    // Convert start and end times to timestamps
+    $start_timestamp = strtotime($start_time);
+    $end_timestamp = strtotime($end_time);
+
+    // Ensure the end time is after the start time
+    if ($start_timestamp >= $end_timestamp) {
+        return "Invalid reservation times.";
+    }
+
+    // Calculate the duration in hours (round up to the next hour)
+    $hours_reserved = ceil(($end_timestamp - $start_timestamp) / 3600);
+
+    // Calculate the total payment (rate is in decimal format, so convert to cents for Stripe)
+    $total_payment = $hours_reserved * $rate_per_hour * 100; // Convert to cents
+
+    return $total_payment; // Return the total amount in cents
 }
+

@@ -228,8 +228,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         <section class="contact-info">
             <h2>Our Contact Information</h2>
-            <p><strong>Address:</strong> 123 Parking Street, City, Country, ZIP</p>
-            <p><strong>Phone:</strong> +1 (123) 456-7890</p>
+            <p><strong>Address:</strong> 20/4, Delgahawatta, Panadura</p>
+            <p><strong>Phone:</strong> +94 76 883 7380</p>
             <p><strong>Email:</strong> info@parkease.com</p>
             <p><strong>Business Hours:</strong> Monday to Friday, 9:00 AM - 5:00 PM</p>
         </section>

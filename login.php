@@ -1,11 +1,21 @@
 <?php
-require_once 'includes/config.php';
-require_once 'includes/db.php';
-require_once 'includes/functions.php';
+require_once 'includes/auth.php';
 
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
+
+// Check if user is already logged in
+$user = check_login();
+if ($user) {
+    if ($user['role'] === 'admin') {
+        header("Location: admin.php");
+    } else {
+        header("Location: dashboard.php");
+    }
+    exit();
+}
+
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -15,16 +25,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (empty($username) || empty($password)) {
         $error = "Please enter both username and password.";
     } else {
-        $user = attempt_login($username, $password);
-
-        if ($user) {
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['role'] = $user['role'];
-            header("Location: dashboard.php");
+        // Check if the hardcoded admin credentials are used
+        if ($username === 'admin' && $password === 'admin') {
+            // Set session variables for admin user
+            $_SESSION['user_id'] = 1;  // Example admin ID
+            $_SESSION['username'] = 'admin';
+            $_SESSION['role'] = 'admin';
+            header("Location: admin.php");
             exit();
         } else {
-            $error = "Invalid username or password.";
+            // Otherwise, perform a normal login check
+            $user = attempt_login($username, $password);
+
+            if ($user) {
+                $_SESSION['user_id'] = $user['id'];
+                $_SESSION['username'] = $user['username'];
+                $_SESSION['role'] = $user['role'];
+                if ($user['role'] === 'admin') {
+                    header("Location: admin.php");
+                } else {
+                    header("Location: dashboard.php");
+                }
+                exit();
+            } else {
+                $error = "Invalid username or password.";
+            }
         }
     }
 }
@@ -204,7 +229,7 @@ $current_page = 'login';
         <div class="login-form">
             <h1>Login</h1>
             <?php if ($error): ?>
-                <p class="error"><?php echo $error; ?></p>
+                <p class="error"><?php echo htmlspecialchars($error); ?></p>
             <?php endif; ?>
             <form action="login.php" method="POST">
                 <div class="form-group">

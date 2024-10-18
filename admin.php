@@ -7,17 +7,55 @@ require_once 'includes/auth.php';
 // Ensure only admin users can access this page
 $user = require_admin();
 
-// Handle adding new parking spot
+// Variables to hold the current parking spot data (for edit mode)
+$edit_spot_id = '';
+$edit_name = '';
+$edit_latitude = '';
+$edit_longitude = '';
+$edit_hourly_rate = '';
+
+// Handle adding a new parking spot or updating an existing one
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_spot'])) {
     $name = $_POST['name'] ?? '';
     $latitude = $_POST['latitude'] ?? '';
     $longitude = $_POST['longitude'] ?? '';
     $hourly_rate = $_POST['hourly_rate'] ?? '';
+    $id = $_POST['id'] ?? '';
 
-    if (add_parking_spot($name, $latitude, $longitude, $hourly_rate)) {
-        $success_message = "Parking spot added successfully.";
+    if ($id) {
+        // Update existing parking spot
+        if (update_parking_spot($id, $name, $latitude, $longitude, $hourly_rate)) {
+            $success_message = "Parking spot updated successfully.";
+        } else {
+            $error_message = "Failed to update parking spot.";
+        }
     } else {
-        $error_message = "Failed to add parking spot.";
+        // Add a new parking spot
+        if (add_parking_spot($name, $latitude, $longitude, $hourly_rate)) {
+            $success_message = "Parking spot added successfully.";
+        } else {
+            $error_message = "Failed to add parking spot.";
+        }
+    }
+}
+
+// Handle editing a parking spot
+if (isset($_POST['edit_spot'])) {
+    $edit_spot_id = $_POST['id'] ?? '';
+    $edit_name = $_POST['name'] ?? '';
+    $edit_latitude = $_POST['latitude'] ?? '';
+    $edit_longitude = $_POST['longitude'] ?? '';
+    $edit_hourly_rate = $_POST['hourly_rate'] ?? '';
+}
+
+// Handle deleting a parking spot
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['delete_spot'])) {
+    $id = $_POST['id'] ?? '';
+
+    if (delete_parking_spot($id)) {
+        $success_message = "Parking spot deleted successfully.";
+    } else {
+        $error_message = "Failed to delete parking spot.";
     }
 }
 
@@ -25,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['add_spot'])) {
 $parking_spots = get_all_parking_spots();
 $reservations = get_all_reservations();
 
-// Calculate some basic statistics
+// Calculate basic statistics
 $total_spots = count($parking_spots);
 $total_reservations = count($reservations);
 $total_revenue = array_sum(array_column($reservations, 'total_cost'));
@@ -229,43 +267,33 @@ $current_page = 'admin';
     <main class="container">
         <h1>Admin Panel</h1>
         
+        <!-- Display Success or Error Messages -->
+        <?php
+        if (isset($success_message)) {
+            echo "<p class='success-message'>$success_message</p>";
+        }
+        if (isset($error_message)) {
+            echo "<p class='error-message'>$error_message</p>";
+        }
+        ?>
+        
+        <!-- Add/Edit Parking Spot Form -->
         <section class="admin-section">
-            <h2>Dashboard</h2>
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <h3>Total Parking Spots</h3>
-                    <p><?php echo $total_spots; ?></p>
-                </div>
-                <div class="stat-card">
-                    <h3>Total Reservations</h3>
-                    <p><?php echo $total_reservations; ?></p>
-                </div>
-                <div class="stat-card">
-                    <h3>Total Revenue</h3>
-                    <p>$<?php echo number_format($total_revenue, 2); ?></p>
-                </div>
-            </div>
-        </section>
-
-        <section class="admin-section">
-            <h2>Add New Parking Spot</h2>
-            <?php
-            if (isset($success_message)) {
-                echo "<p class='success-message'>$success_message</p>";
-            }
-            if (isset($error_message)) {
-                echo "<p class='error-message'>$error_message</p>";
-            }
-            ?>
+            <h2><?php echo $edit_spot_id ? 'Edit Parking Spot' : 'Add New Parking Spot'; ?></h2>
             <form action="admin.php" method="POST">
-                <input type="text" name="name" placeholder="Spot Name" required>
-                <input type="number" name="latitude" placeholder="Latitude" step="any" required>
-                <input type="number" name="longitude" placeholder="Longitude" step="any" required>
-                <input type="number" name="hourly_rate" placeholder="Hourly Rate" step="0.01" required>
-                <button type="submit" name="add_spot">Add Parking Spot</button>
+                <!-- Hidden field to store the ID of the parking spot being edited -->
+                <input type="hidden" name="id" value="<?php echo htmlspecialchars($edit_spot_id); ?>">
+                
+                <input type="text" name="name" placeholder="Spot Name" value="<?php echo htmlspecialchars($edit_name); ?>" required>
+                <input type="number" name="latitude" placeholder="Latitude" step="any" value="<?php echo htmlspecialchars($edit_latitude); ?>" required>
+                <input type="number" name="longitude" placeholder="Longitude" step="any" value="<?php echo htmlspecialchars($edit_longitude); ?>" required>
+                <input type="number" name="hourly_rate" placeholder="Hourly Rate" step="0.01" value="<?php echo htmlspecialchars($edit_hourly_rate); ?>" required>
+                
+                <button type="submit" name="add_spot"><?php echo $edit_spot_id ? 'Update Parking Spot' : 'Add Parking Spot'; ?></button>
             </form>
         </section>
 
+        <!-- Parking Spots List -->
         <section class="admin-section">
             <h2>Parking Spots</h2>
             <table>
@@ -276,6 +304,7 @@ $current_page = 'admin';
                         <th>Latitude</th>
                         <th>Longitude</th>
                         <th>Hourly Rate</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -286,12 +315,28 @@ $current_page = 'admin';
                         <td><?php echo htmlspecialchars($spot['latitude']); ?></td>
                         <td><?php echo htmlspecialchars($spot['longitude']); ?></td>
                         <td>$<?php echo htmlspecialchars($spot['hourly_rate']); ?></td>
+                        <td>
+                            <!-- Edit Button -->
+                            <form action="admin.php" method="POST" style="display:inline;">
+                                <input type="hidden" name="id" value="<?php echo htmlspecialchars($spot['id']); ?>">
+                                <input type="hidden" name="name" value="<?php echo htmlspecialchars($spot['name']); ?>">
+                                <input type="hidden" name="latitude" value="<?php echo htmlspecialchars($spot['latitude']); ?>">
+                                <input type="hidden" name="longitude" value="<?php echo htmlspecialchars($spot['longitude']); ?>">
+                                <input type="hidden" name="hourly_rate" value="<?php echo htmlspecialchars($spot['hourly_rate']); ?>">
+                                <button type="submit" name="edit_spot">Edit</button>
+                            </form>
+                            
+                            <!-- Delete Button -->
+                            <form action="admin.php" method="POST" style="display:inline;">
+                                <input type="hidden" name="id" value="<?php echo htmlspecialchars($spot['id']); ?>">
+                                <button type="submit" name="delete_spot" onclick="return confirm('Are you sure you want to delete this spot?');">Delete</button>
+                            </form>
+                        </td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
         </section>
-
         <section class="admin-section">
             <h2>Recent Reservations</h2>
             <table>
@@ -302,7 +347,6 @@ $current_page = 'admin';
                         <th>Parking Spot</th>
                         <th>Start Time</th>
                         <th>End Time</th>
-                        <th>Total Cost</th>
                         <th>Status</th>
                     </tr>
                 </thead>
@@ -314,13 +358,13 @@ $current_page = 'admin';
                         <td><?php echo htmlspecialchars($reservation['spot_name']); ?></td>
                         <td><?php echo htmlspecialchars($reservation['start_time']); ?></td>
                         <td><?php echo htmlspecialchars($reservation['end_time']); ?></td>
-                        <td>$<?php echo htmlspecialchars($reservation['total_cost']); ?></td>
                         <td><?php echo htmlspecialchars($reservation['status']); ?></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
         </section>
+
     </main>
 
     <footer>

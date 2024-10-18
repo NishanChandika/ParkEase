@@ -1,10 +1,15 @@
 <?php
-require_once 'includes/config.php';
-require_once 'includes/db.php';
-require_once 'includes/functions.php';
+require_once 'includes/auth.php';
 
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
+}
+
+// Check if user is already logged in
+$user = check_login();
+if ($user) {
+    header("Location: dashboard.php");
+    exit();
 }
 
 $error = '';
@@ -214,10 +219,10 @@ $current_page = 'register';
         <div class="register-form">
             <h1>Register</h1>
             <?php if ($error): ?>
-                <p class="error"><?php echo $error; ?></p>
+                <p class="error"><?php echo htmlspecialchars($error); ?></p>
             <?php endif; ?>
             <?php if ($success): ?>
-                <p class="success"><?php echo $success; ?></p>
+                <p class="success"><?php echo htmlspecialchars($success); ?></p>
             <?php endif; ?>
             <form action="register.php" method="POST">
                 <div class="form-group">

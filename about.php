@@ -166,17 +166,17 @@ $current_page = 'about';
             <h2>Our Team</h2>
             <div class="team-section">
                 <div class="team-member">
-                    <img src="path/to/team-member-1.jpg" alt="John Doe">
+                    
                     <h3>John Doe</h3>
                     <p>Co-founder & CEO</p>
                 </div>
                 <div class="team-member">
-                    <img src="path/to/team-member-2.jpg" alt="Jane Smith">
+                    
                     <h3>Jane Smith</h3>
                     <p>Co-founder & CTO</p>
                 </div>
                 <div class="team-member">
-                    <img src="path/to/team-member-3.jpg" alt="Mike Johnson">
+                    
                     <h3>Mike Johnson</h3>
                     <p>Head of Operations</p>
                 </div>

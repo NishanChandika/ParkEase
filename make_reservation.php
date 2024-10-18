@@ -13,6 +13,9 @@ if (!$user) {
 $message = '';
 $parking_spots = get_all_parking_spots();
 
+// Check if redirected after successful payment
+$payment_success = isset($_GET['payment']) && $_GET['payment'] === 'success';
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $spot_id = $_POST['spot_id'] ?? '';
     $start_time = $_POST['start_time'] ?? '';
@@ -32,9 +35,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $hours = $duration->h + ($duration->days * 24);
             $total_cost = $hours * $spot['hourly_rate'];
 
-            $reservation_id = create_reservation($user['id'], $spot_id, $start_time, $end_time, $total_cost);
+            // Create the reservation as pending
+            $reservation_id = create_reservation($user['id'], $spot_id, $start_time, $end_time, $total_cost, 'pending');
             if ($reservation_id) {
-                $message = '<p class="success">Reservation successfully created!</p>';
+                // Redirect to the checkout page
+                header("Location: create_checkout_session.php?reservation_id={$reservation_id}&cost={$total_cost}");
+                exit;
             } else {
                 $message = '<p class="error">Failed to create reservation. Please try again.</p>';
             }
@@ -51,7 +57,6 @@ $current_page = 'make_reservation';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Make a Reservation - ParkEase</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary-color: #3498db;
@@ -236,18 +241,10 @@ $current_page = 'make_reservation';
     </footer>
 
     <script>
-        // Set minimum date-time for start_time and end_time
-        const now = new Date();
-        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-        const minDateTime = now.toISOString().slice(0, 16);
-
-        document.getElementById('start_time').min = minDateTime;
-        document.getElementById('end_time').min = minDateTime;
-
-        // Update end_time min when start_time changes
-        document.getElementById('start_time').addEventListener('change', function() {
-            document.getElementById('end_time').min = this.value;
-        });
+        // Check if the page was loaded with the payment=success query parameter
+        <?php if ($payment_success): ?>
+            alert('Payment was successful! Your reservation is confirmed.');
+        <?php endif; ?>
     </script>
 </body>
 </html>
